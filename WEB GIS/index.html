@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIS Wisata Pasaman Barat</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: 'Inter', sans-serif; background: #f1f3f6; color: #333; }
+    header {
+      background: linear-gradient(to right, #004466, #006699);
+      color: white;
+      padding: 24px 0;
+      text-align: center;
+      font-size: 28px;
+      font-weight: 600;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    #map { height: 500px; border-bottom: 4px solid #ccc; }
+    #list {
+      padding: 30px;
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      margin-top: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
+    #list h3 { margin-bottom: 16px; font-size: 22px; color: #004466; }
+    #list ul { list-style: none; padding: 0; }
+    #list li { margin: 8px 0; }
+    #list a {
+      text-decoration: none;
+      color: #007BFF;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    #search-box { text-align: center; margin: 20px 0; }
+    #searchInput, #kategori-filter {
+      padding: 10px;
+      width: 250px;
+      font-size: 16px;
+      margin: 5px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    .popup-img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <header>Sistem Informasi Geografis - Wisata Pasaman Barat</header>
+  <div id="map"></div>
+  <section id="list">
+    <div id="search-box">
+      <input type="text" id="searchInput" placeholder="Cari objek wisata..." oninput="cariObjek()" />
+      <select id="kategori-filter" onchange="cariObjek()">
+        <option value="">Semua Kategori</option>
+        <option value="Alam">Alam</option>
+        <option value="Pantai">Pantai</option>
+      </select>
+    </div>
+    <h3>Data Objek Wisata</h3>
+    <ul id="objekList"></ul>
+  </section>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const wisataData = {
+      "type": "FeatureCollection",
+      "features": [
+        { "type": "Feature", "properties": {"nama": "Gunung Talamau", "keterangan": "Gunung tertinggi di Sumatera Barat", "kategori": "Alam", "img": "https://via.placeholder.com/300x150?text=Gunung+Talamau"}, "geometry": {"type": "Point", "coordinates": [99.98, 0.08]} },
+        { "type": "Feature", "properties": {"nama": "Air Terjun Sipagogo", "keterangan": "Air terjun indah di tengah hutan", "kategori": "Alam", "img": "https://via.placeholder.com/300x150?text=Sipagogo"}, "geometry": {"type": "Point", "coordinates": [99.59, 0.412]} },
+        { "type": "Feature", "properties": {"nama": "Pantai Sasak", "keterangan": "Pantai eksotis di pinggir Samudra", "kategori": "Pantai", "img": "https://via.placeholder.com/300x150?text=Pantai+Sasak"}, "geometry": {"type": "Point", "coordinates": [99.69, 0.0]} },
+        { "type": "Feature", "properties": {"nama": "Pantai Tugu Bangis", "keterangan": "Pantai bersejarah dengan tugu kemerdekaan", "kategori": "Pantai", "img": "https://via.placeholder.com/300x150?text=Tugu+Bangis"}, "geometry": {"type": "Point", "coordinates": [99.37, 0.22]} },
+        { "type": "Feature", "properties": {"nama": "Pohon Seribu Sasak", "keterangan": "Wisata alam dengan pohon-pohon besar", "kategori": "Alam", "img": "https://via.placeholder.com/300x150?text=Seribu+Sasak"}, "geometry": {"type": "Point", "coordinates": [99.74, -0.025]} }
+      ]
+    };
+
+    const map = L.map('map').setView([0.2, 99.7], 10);
+
+    const baseMaps = {
+      "Peta Jalan": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'Leaflet | © OpenStreetMap contributors' }),
+      "Peta Satelit": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' }),
+      "Mode Gelap": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CartoDB' })
+    };
+
+    baseMaps["Peta Jalan"].addTo(map);
+    L.control.layers(baseMaps).addTo(map);
+
+    const list = document.getElementById("objekList");
+    const markerLayers = [];
+
+    const wisataLayer = L.geoJSON(wisataData, {
+      onEachFeature: function (feature, layer) {
+        const { nama, keterangan, kategori, img } = feature.properties;
+        const popup = `<strong>${nama}</strong><br>${keterangan}<br><em>Kategori: ${kategori}</em><br><img src='${img}' class='popup-img'>`;
+        layer.bindPopup(popup);
+        markerLayers.push({ nama: nama.toLowerCase(), kategori, marker: layer });
+
+        // Klik ikon akan fokus ke lokasi
+        layer.on('click', () => {
+          map.setView(layer.getLatLng(), 14);
+          layer.openPopup();
+        });
+
+        const li = document.createElement("li");
+        li.innerHTML = `<a>${nama}</a>`;
+        li.onclick = () => {
+          map.setView(layer.getLatLng(), 14);
+          layer.openPopup();
+        };
+        list.appendChild(li);
+      }
+    }).addTo(map);
+
+    function cariObjek() {
+      const keyword = document.getElementById("searchInput").value.toLowerCase();
+      const kategori = document.getElementById("kategori-filter").value;
+      list.innerHTML = "";
+      markerLayers.forEach(obj => {
+        const cocokNama = obj.nama.includes(keyword);
+        const cocokKategori = !kategori || obj.kategori === kategori;
+        if (cocokNama && cocokKategori) {
+          const li = document.createElement("li");
+          li.innerHTML = `<a>${obj.marker.feature.properties.nama}</a>`;
+          li.onclick = () => {
+            map.setView(obj.marker.getLatLng(), 14);
+            obj.marker.openPopup();
+          };
+          list.appendChild(li);
+        }
+      });
+    }
+
+    const resetBtn = L.control({ position: 'topright' });
+    resetBtn.onAdd = function () {
+      const div = L.DomUtil.create('div', 'leaflet-bar');
+      div.innerHTML = '<a href="#" title="Reset View" style="padding:4px; background:#fff; display:block;">🔄</a>';
+      div.onclick = () => map.setView([0.2, 99.7], 10);
+      return div;
+    };
+    resetBtn.addTo(map);
+  </script>
+</body>
+</html>
